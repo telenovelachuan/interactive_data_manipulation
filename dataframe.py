@@ -14,7 +14,7 @@ class idm_dataframe():
 		self._df = _df
 		self.col_num_for_summary = 7
 		self.ctg_unique_cnt_hard = 5
-		self.ctg_unique_cnt_soft = 20
+		self.ctg_unique_cnt_soft = 50
 		self.qt_for_hist = 0.95
 		self.top_n_for_freq = 20
 		self.avg_freq_thld = 2
