@@ -13,23 +13,31 @@ class idm_dataframe():
 	def __init__(self, _df):
 		self._df = _df
 		self.col_num_for_summary = 7
-		self.ctg_unique_cnt = 10
+		self.ctg_unique_cnt_hard = 5
+		self.ctg_unique_cnt_soft = 20
 		self.qt_for_hist = 0.95
+		self.top_n_for_freq = 20
+		self.avg_freq_thld = 2
 		sns.set()
 
 	def to_pd_df(self):
 		return self._df
 
 	def detect_type(self, column):
-		unique_cnt = len(self._df[column].unique())
-		if unique_cnt <= self.ctg_unique_cnt:
-			return "categorical"
-
+		
+		
 		pd_type = self._df.dtypes[column]
+		if np.issubdtype(pd_type, np.datetime64):
+			return "date"
+		unique_cnt = len(self._df[column].unique())
+		if unique_cnt <= self.ctg_unique_cnt_hard:
+			return "categorical"
 		if pd_type in [np.dtype(t) for t in NUMPY_NUMERIC_TYPES]:
 			return "numeric"
-		elif np.issubdtype(pd_type, np.datetime64):
-			return "date"
+		avg_freq = self._df[column].value_counts().mean()
+		if unique_cnt <= self.ctg_unique_cnt_soft and avg_freq >= self.avg_freq_thld:
+			return "categorical"
+		
 		return "other"
 
 	def _plot_date(self, column):
@@ -50,7 +58,14 @@ class idm_dataframe():
 
 	def _plot_ctg(self, column):
 		_df = self._df
-		
+		grouper = _df.groupby(column).count()
+		_col0 = grouper.columns[0]
+		df_ctg = grouper.sort_values(_col0, ascending=False).rename(columns={_col0: "freq"})[:self.top_n_for_freq]
+		df_ctg[column] = df_ctg.index.tolist()
+
+		_ax = sns.barplot(x='freq', y=column, data=df_ctg)
+		plt.title(f"'{column}' Value Frequency")
+		return _ax
 
 	def get_col_summary(self, column):
 		_type = self.detect_type(column)
@@ -58,6 +73,8 @@ class idm_dataframe():
 			return self._plot_date(column)
 		elif _type == "numeric":
 			return self._plot_numeric(column)
+		elif _type == "categorical":
+			return self._plot_ctg(column)
 		return None
 
 
