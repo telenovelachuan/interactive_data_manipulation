@@ -5,6 +5,7 @@ import ipywidgets as widgets
 from matplotlib import pyplot as plt
 from IPython.display import display, clear_output
 from dataframe import idm_dataframe
+from summary import idm_tabs
 
 local_vars = []
 local_dfs = {}
@@ -13,13 +14,19 @@ menu_out = widgets.Output(layout=Layout(border='solid 1px black'))
 pre_canvas_out = widgets.Output(layout=Layout(border='solid 1px red'))
 canvas_out = widgets.Output(layout=Layout(border='solid 1px orange'))
 post_canvas_out = widgets.Output(layout=Layout(border='solid 1px yellow'))
+backward_paging_text = "...previous"
+forward_paging_text = "...next"
 _configs = {
 	"menu_unfolded": False,
 	"chosen_df": None,
 	"menus": ["Summary", "Drop NA", "Dedup", "Join", "Transpose"],
 	"col_num_for_summary": 7,
 	"df": None,
-	"summary_tab_outputs": {}
+	"tab_paging_start": 0,
+	"tab_paging_end": -1,
+	"idm_tabs": None,
+	"tabs_children": [],
+	"_tab": None
 }
 
 def render_essentials():
@@ -33,15 +40,11 @@ def render_essentials():
 	df_dropdown.observe(df_dpd_change)
 	display(widgets.HBox([df_dpd_label, df_dropdown]))
 
-def _summary_tab_changed(widget):
-	tab_idx = widget['new']
-	_df = _configs["df"]
+def _render_single_tab(_df, col_name, out):
+	
+	out.clear_output(wait=True)
 	_pd_df = _df.to_pd_df()
-	# lazy load the selected tab
-	col_name = _pd_df.columns[tab_idx]
-	_out = _configs["summary_tab_outputs"][col_name]
-	_out.clear_output(wait=True)
-	with _out:
+	with out:
 		_fig, _axes = plt.subplots(figsize=(16, 7))
 		_axes = _df.get_col_summary(col_name)
 		_val_unique_cnt = len(_pd_df[col_name].unique())
@@ -53,44 +56,101 @@ def _summary_tab_changed(widget):
 			plt.close()
 			display(widgets.Label(value=f"Example Values:"))
 			print(_pd_df[[col_name]].head(5))
-			_fig, _axes = None, None
 
-	
+def _click_paging_tab(direction="forward"):
+	if direction == "forward":
+		_configs["tab_paging_start"] += _configs["col_num_for_summary"]
+		_configs["tab_paging_end"] = min(_configs["tab_paging_start"] + _configs["col_num_for_summary"], len(_configs["df"].to_pd_df().columns) - 1)
+		with canvas_out:
+			print(f'start:{_configs["tab_paging_start"]}, end:{_configs["tab_paging_end"]}')
+			print(f'columns:{list(_configs["df"].to_pd_df().columns)[_configs["tab_paging_start"]: _configs["tab_paging_end"]]}')
+		pre_canvas_out.clear_output()
+		_render_summary()
+		_configs["_tab"].selected_index = 1
+	else:
+
+		_configs["tab_paging_start"] -= _configs["col_num_for_summary"]
+		_configs["tab_paging_end"] = _configs["tab_paging_start"] + _configs["col_num_for_summary"]
+		pre_canvas_out.clear_output()
+		_render_summary()
+		if _configs["tab_paging_start"] != 0:
+			_configs["_tab"].selected_index = 1
+
+def _summary_tab_changed(widget):
+	tab_idx = widget['new']
+	tab_title = widget["owner"]._titles[str(tab_idx)]
+	_df = _configs["df"]
+	_pd_df = _df.to_pd_df()
+	if tab_title == backward_paging_text:
+		_click_paging_tab("backward")
+		return
+	elif tab_title == forward_paging_text:
+		_click_paging_tab("forward")
+		return
+		
+	_render_single_tab(_df, tab_title, out=_configs["tabs_children"][tab_idx])
+
 
 def _render_summary():
 	_df = _configs["df"]
-	head_cols = _df.to_pd_df().columns[:_configs["col_num_for_summary"]]
-	children = []
+	total_col_cnt = len(_df.to_pd_df().columns)
+	_backward_paging, _forward_paging = False, False
+	tabs = idm_tabs(_df)
+	_configs["idm_tabs"] = tabs
+	if _configs["tab_paging_end"] == -1:
+		_configs["tab_paging_end"] = min(_configs["tab_paging_start"] + _configs["col_num_for_summary"], total_col_cnt - 1)
+	head_cols = list(_df.to_pd_df().columns[_configs["tab_paging_start"]: _configs["tab_paging_end"]])
+
+
+	# generate backward paging tab if valid
+	if _configs["tab_paging_start"] != 0:
+		_backward_paging = True
+		children = [widgets.Output()]
+	else:
+		children = []
+
 	for idx, _col in enumerate(head_cols):
 		_out = widgets.Output()
 		#_type = _df.detect_type(_col)
 		_child = widgets.Label(value=f"Column '{_col}'")
 
-		with _out:
-			# only render the first one
-			if idx == 0:				
-				_fig, _axes = plt.subplots(figsize=(16, 7))
-				_axes = _df.get_col_summary(_col)
-				_val_unique_cnt = len(_df.to_pd_df()[_col].unique())
-				_label = widgets.Label(value=f"potential type: {_df.detect_type(_col)}, {_val_unique_cnt} different values.")
-				display(_label)
-				if _axes is not None:
-					plt.show(_fig)
-				else:
-					plt.close()
-					display(widgets.Label(value=f"Example Values:"))
-					print(_df.to_pd_df()[[_col]].head(5))
-					_fig, _axes = None, None
+		# with _out:
+		# 	# only render the first one
+		# 	if idx == 0:				
+		# 		_fig, _axes = plt.subplots(figsize=(16, 7))
+		# 		_axes = _df.get_col_summary(_col)
+		# 		_val_unique_cnt = len(_df.to_pd_df()[_col].unique())
+		# 		_label = widgets.Label(value=f"potential type: {_df.detect_type(_col)}, {_val_unique_cnt} different values.")
+		# 		display(_label)
+		# 		if _axes is not None:
+		# 			plt.show(_fig)
+		# 		else:
+		# 			plt.close()
+		# 			display(widgets.Label(value=f"Example Values:"))
+		# 			print(_df.to_pd_df()[[_col]].head(5))
+		# 			_fig, _axes = None, None
+		if idx == 0:
+			_render_single_tab(_df, _col, _out)
 
-		children.append(_out)
-		_configs["summary_tab_outputs"][_col] = _out
+		_configs["idm_tabs"].set_output(_col, _out)
+		children.append(_configs["idm_tabs"].get_output(_col))
+
+	if _configs["tab_paging_end"] != total_col_cnt - 1:
+		_forward_paging = True
+		children.append(widgets.Output())
+		head_cols.append(forward_paging_text)
 
 	tab = widgets.Tab()
 	tab.children = children
+	_configs["tabs_children"] = children
 	tab.observe(_summary_tab_changed, names='selected_index')
+	if _backward_paging is True:
+		head_cols = [backward_paging_text] + head_cols
 	[tab.set_title(num, name) for num, name in enumerate(head_cols)]
+	_configs["_tab"] = tab
 	with pre_canvas_out:
 		display(tab)
+
 
 def _gnrt_btn_click(menu_name):
 	def _btn_click(b):
@@ -152,4 +212,3 @@ def load():
 	# with main_out:
 	# 	display(widgets.HBox([df_dpd_label, df_dropdown]))
 
-print(locals()["_render_summary"])
