@@ -19,6 +19,7 @@ _configs = {
 	"menus": ["Summary", "Drop NA", "Dedup", "Join", "Transpose"],
 	"col_num_for_summary": 7,
 	"df": None,
+	"summary_tab_outputs": {}
 }
 
 def render_essentials():
@@ -32,25 +33,62 @@ def render_essentials():
 	df_dropdown.observe(df_dpd_change)
 	display(widgets.HBox([df_dpd_label, df_dropdown]))
 
+def _summary_tab_changed(widget):
+	tab_idx = widget['new']
+	_df = _configs["df"]
+	_pd_df = _df.to_pd_df()
+	# lazy load the selected tab
+	col_name = _pd_df.columns[tab_idx]
+	_out = _configs["summary_tab_outputs"][col_name]
+	_out.clear_output(wait=True)
+	with _out:
+		_fig, _axes = plt.subplots(figsize=(16, 7))
+		_axes = _df.get_col_summary(col_name)
+		_val_unique_cnt = len(_pd_df[col_name].unique())
+		_label = widgets.Label(value=f"potential type: {_df.detect_type(col_name)}, {_val_unique_cnt} different values.")
+		display(_label)
+		if _axes is not None:
+			plt.show(_fig)
+		else:
+			plt.close()
+			display(widgets.Label(value=f"Example Values:"))
+			print(_pd_df[[col_name]].head(5))
+			_fig, _axes = None, None
+
+	
+
 def _render_summary():
 	_df = _configs["df"]
-	cols = _df.to_pd_df().columns[:_configs["col_num_for_summary"]]
+	head_cols = _df.to_pd_df().columns[:_configs["col_num_for_summary"]]
 	children = []
-	for _col in cols:
+	for idx, _col in enumerate(head_cols):
 		_out = widgets.Output()
 		#_type = _df.detect_type(_col)
 		_child = widgets.Label(value=f"Column '{_col}'")
 
 		with _out:
-			_fig, _axes = plt.subplots(figsize=(16, 7))
-			_axes = _df.get_col_summary(_col)
-			plt.show(_fig)
+			# only render the first one
+			if idx == 0:				
+				_fig, _axes = plt.subplots(figsize=(16, 7))
+				_axes = _df.get_col_summary(_col)
+				_val_unique_cnt = len(_df.to_pd_df()[_col].unique())
+				_label = widgets.Label(value=f"potential type: {_df.detect_type(_col)}, {_val_unique_cnt} different values.")
+				display(_label)
+				if _axes is not None:
+					plt.show(_fig)
+				else:
+					plt.close()
+					display(widgets.Label(value=f"Example Values:"))
+					print(_df.to_pd_df()[[_col]].head(5))
+					_fig, _axes = None, None
 
 		children.append(_out)
+		_configs["summary_tab_outputs"][_col] = _out
 
 	tab = widgets.Tab()
 	tab.children = children
-	[tab.set_title(num, name) for num, name in enumerate(cols)]
+	tab.observe(_summary_tab_changed, names='selected_index')
+	[tab.set_title(num, name) for num, name in enumerate(head_cols)]
 	with pre_canvas_out:
 		display(tab)
 
