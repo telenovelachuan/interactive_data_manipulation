@@ -61,14 +61,10 @@ def _click_paging_tab(direction="forward"):
 	if direction == "forward":
 		_configs["tab_paging_start"] += _configs["col_num_for_summary"]
 		_configs["tab_paging_end"] = min(_configs["tab_paging_start"] + _configs["col_num_for_summary"], len(_configs["df"].to_pd_df().columns) - 1)
-		with canvas_out:
-			print(f'start:{_configs["tab_paging_start"]}, end:{_configs["tab_paging_end"]}')
-			print(f'columns:{list(_configs["df"].to_pd_df().columns)[_configs["tab_paging_start"]: _configs["tab_paging_end"]]}')
 		pre_canvas_out.clear_output()
 		_render_summary()
 		_configs["_tab"].selected_index = 1
 	else:
-
 		_configs["tab_paging_start"] -= _configs["col_num_for_summary"]
 		_configs["tab_paging_end"] = _configs["tab_paging_start"] + _configs["col_num_for_summary"]
 		pre_canvas_out.clear_output()
@@ -111,24 +107,8 @@ def _render_summary():
 
 	for idx, _col in enumerate(head_cols):
 		_out = widgets.Output()
-		#_type = _df.detect_type(_col)
 		_child = widgets.Label(value=f"Column '{_col}'")
 
-		# with _out:
-		# 	# only render the first one
-		# 	if idx == 0:				
-		# 		_fig, _axes = plt.subplots(figsize=(16, 7))
-		# 		_axes = _df.get_col_summary(_col)
-		# 		_val_unique_cnt = len(_df.to_pd_df()[_col].unique())
-		# 		_label = widgets.Label(value=f"potential type: {_df.detect_type(_col)}, {_val_unique_cnt} different values.")
-		# 		display(_label)
-		# 		if _axes is not None:
-		# 			plt.show(_fig)
-		# 		else:
-		# 			plt.close()
-		# 			display(widgets.Label(value=f"Example Values:"))
-		# 			print(_df.to_pd_df()[[_col]].head(5))
-		# 			_fig, _axes = None, None
 		if idx == 0:
 			_render_single_tab(_df, _col, _out)
 
@@ -192,6 +172,7 @@ def df_dpd_change(change):
         _configs["df"] = _df
         canvas_out.clear_output()
         with canvas_out:
+        	display(widgets.Label(value="Data Preview:"))
         	display(_df.to_pd_df())
 
         if _configs["menu_unfolded"] is False:
