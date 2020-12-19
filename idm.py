@@ -9,17 +9,20 @@ from summary import idm_tabs
 
 local_vars = []
 local_dfs = {}
-main_out = widgets.Output(layout=Layout(border='solid 1px black'))
-menu_out = widgets.Output(layout=Layout(border='solid 1px black'))
-pre_canvas_out = widgets.Output(layout=Layout(border='solid 1px red'))
-canvas_out = widgets.Output(layout=Layout(border='solid 1px orange'))
-post_canvas_out = widgets.Output(layout=Layout(border='solid 1px yellow'))
+#main_out = widgets.Output(layout=Layout(border='solid 1px black'))
+main_out = widgets.Output()
+menu_out = widgets.Output()
+pre_canvas_out = widgets.Output()
+df_intro_out = widgets.Output()
+tabs_out = widgets.Output()
+canvas_out = widgets.Output()
+post_canvas_out = widgets.Output()
 backward_paging_text = "...previous"
 forward_paging_text = "...next"
 _configs = {
 	"menu_unfolded": False,
 	"chosen_df": None,
-	"menus": ["Summary", "Drop NA", "Dedup", "Join", "Transpose"],
+	"menus": ["Summary", "Drop NA", "Filter", "Dedup", "Join", "Transpose"],
 	"col_num_for_summary": 7,
 	"df": None,
 	"tab_paging_start": 0,
@@ -46,11 +49,11 @@ def _render_single_tab(_df, col_name, out):
 	_pd_df = _df.to_pd_df()
 	with out:
 		_fig, _axes = plt.subplots(figsize=(16, 7))
-		_axes = _df.get_col_summary(col_name)
-		_val_unique_cnt = len(_pd_df[col_name].unique())
-		_label = widgets.Label(value=f"potential type: {_df.detect_type(col_name)}, {_val_unique_cnt} different values.")
+		_axes = _df.get_col_summary(col_name, _fig)
+		_label = widgets.Label(value=_df.get_col_info_text(col_name))
 		display(_label)
 		if _axes is not None:
+			
 			plt.show(_fig)
 		else:
 			plt.close()
@@ -61,13 +64,13 @@ def _click_paging_tab(direction="forward"):
 	if direction == "forward":
 		_configs["tab_paging_start"] += _configs["col_num_for_summary"]
 		_configs["tab_paging_end"] = min(_configs["tab_paging_start"] + _configs["col_num_for_summary"], len(_configs["df"].to_pd_df().columns) - 1)
-		pre_canvas_out.clear_output()
+		tabs_out.clear_output()
 		_render_summary()
 		_configs["_tab"].selected_index = 1
 	else:
 		_configs["tab_paging_start"] -= _configs["col_num_for_summary"]
 		_configs["tab_paging_end"] = _configs["tab_paging_start"] + _configs["col_num_for_summary"]
-		pre_canvas_out.clear_output()
+		tabs_out.clear_output()
 		_render_summary()
 		if _configs["tab_paging_start"] != 0:
 			_configs["_tab"].selected_index = 1
@@ -97,6 +100,12 @@ def _render_summary():
 		_configs["tab_paging_end"] = min(_configs["tab_paging_start"] + _configs["col_num_for_summary"], total_col_cnt - 1)
 	head_cols = list(_df.to_pd_df().columns[_configs["tab_paging_start"]: _configs["tab_paging_end"]])
 
+	if _df.intro_loaded is False:
+
+		with df_intro_out:
+			intro_str = _df.get_intro_text()
+			display(widgets.Label(value=intro_str))
+		_df.intro_loaded = True
 
 	# generate backward paging tab if valid
 	if _configs["tab_paging_start"] != 0:
@@ -128,7 +137,7 @@ def _render_summary():
 		head_cols = [backward_paging_text] + head_cols
 	[tab.set_title(num, name) for num, name in enumerate(head_cols)]
 	_configs["_tab"] = tab
-	with pre_canvas_out:
+	with tabs_out:
 		display(tab)
 
 
@@ -145,7 +154,6 @@ def render_menu():
 		_btn = widgets.Button(
 		    description=_menu,
 		    disabled=False,
-		    button_style='', # 'success', 'info', 'warning', 'danger' or ''
 		)
 		_btn.on_click(_gnrt_btn_click(_menu))
 		btns.append(_btn)
@@ -156,6 +164,9 @@ def init_outputs():
 		render_essentials()
 		display(menu_out)
 		display(pre_canvas_out)
+		with pre_canvas_out:
+			display(df_intro_out)
+			display(tabs_out)
 		display(canvas_out)
 		display(post_canvas_out)
 	display(main_out)
@@ -171,6 +182,9 @@ def df_dpd_change(change):
         _df = idm_dataframe(local_dfs[change['new']])
         _configs["df"] = _df
         canvas_out.clear_output()
+        tabs_out.clear_output()
+        df_intro_out.clear_output()
+
         with canvas_out:
         	display(widgets.Label(value="Data Preview:"))
         	display(_df.to_pd_df())
@@ -186,10 +200,6 @@ def load():
 		name, value = item
 		if type(value) == pd.core.frame.DataFrame:
 			local_dfs[name] = value
-
-	
-
 	init_outputs()
-	# with main_out:
-	# 	display(widgets.HBox([df_dpd_label, df_dropdown]))
+
 
