@@ -4,8 +4,8 @@ from ipywidgets import interact, interactive, fixed, interact_manual, Layout
 import ipywidgets as widgets
 from matplotlib import pyplot as plt
 from IPython.display import display, clear_output
-from dataframe import idm_dataframe
-from summary import idm_tabs
+from .dataframe import idm_dataframe
+from .summary import idm_tabs
 
 local_vars = []
 local_dfs = {}
@@ -175,7 +175,7 @@ def load_local_vars():
     from IPython.core.getipython import get_ipython
     shell = get_ipython()
     #n = shell.set_next_input(contents, replace=False)
-    shell.run_cell("idm.local_vars = list(vars().items())")
+    shell.run_cell("interactive_data_manipulation.local_vars = list(vars().items())")
 
 def df_dpd_change(change):
     if change['type'] == 'change' and change['name'] == 'value':
@@ -193,6 +193,7 @@ def df_dpd_change(change):
         	with menu_out:
         		render_menu()
         		_configs["menu_unfolded"] = True
+
 
 def load():
 	load_local_vars()
