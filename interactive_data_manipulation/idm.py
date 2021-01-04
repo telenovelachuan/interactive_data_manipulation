@@ -9,14 +9,16 @@ from .summary import idm_tabs
 
 local_vars = []
 local_dfs = {}
-#main_out = widgets.Output(layout=Layout(border='solid 1px black'))
-main_out = widgets.Output()
-menu_out = widgets.Output()
-pre_canvas_out = widgets.Output()
-df_intro_out = widgets.Output()
-tabs_out = widgets.Output()
-canvas_out = widgets.Output()
-post_canvas_out = widgets.Output()
+outputs = {
+	"main_out": widgets.Output(),
+	"menu_out": widgets.Output(),
+	"pre_canvas_out": widgets.Output(),
+	"df_intro_out": widgets.Output(),
+	"tabs_out": widgets.Output(),
+	"canvas_out": widgets.Output(),
+	"post_canvas_out": widgets.Output(),
+}
+
 backward_paging_text = "...previous"
 forward_paging_text = "...next"
 _configs = {
@@ -64,13 +66,13 @@ def _click_paging_tab(direction="forward"):
 	if direction == "forward":
 		_configs["tab_paging_start"] += _configs["col_num_for_summary"]
 		_configs["tab_paging_end"] = min(_configs["tab_paging_start"] + _configs["col_num_for_summary"], len(_configs["df"].to_pd_df().columns) - 1)
-		tabs_out.clear_output()
+		outputs["tabs_out"].clear_output()
 		_render_summary()
 		_configs["_tab"].selected_index = 1
 	else:
 		_configs["tab_paging_start"] -= _configs["col_num_for_summary"]
 		_configs["tab_paging_end"] = _configs["tab_paging_start"] + _configs["col_num_for_summary"]
-		tabs_out.clear_output()
+		outputs["tabs_out"].clear_output()
 		_render_summary()
 		if _configs["tab_paging_start"] != 0:
 			_configs["_tab"].selected_index = 1
@@ -102,7 +104,7 @@ def _render_summary():
 
 	if _df.intro_loaded is False:
 
-		with df_intro_out:
+		with outputs["df_intro_out"]:
 			intro_str = _df.get_intro_text()
 			display(widgets.Label(value=intro_str))
 		_df.intro_loaded = True
@@ -137,7 +139,7 @@ def _render_summary():
 		head_cols = [backward_paging_text] + head_cols
 	[tab.set_title(num, name) for num, name in enumerate(head_cols)]
 	_configs["_tab"] = tab
-	with tabs_out:
+	with outputs["tabs_out"]:
 		display(tab)
 
 
@@ -160,42 +162,48 @@ def render_menu():
 	display(widgets.HBox(btns))
 
 def init_outputs():
-	with main_out:
+	with outputs["main_out"]:
 		render_essentials()
-		display(menu_out)
-		display(pre_canvas_out)
-		with pre_canvas_out:
-			display(df_intro_out)
-			display(tabs_out)
-		display(canvas_out)
-		display(post_canvas_out)
-	display(main_out)
+		display(outputs["menu_out"])
+		display(outputs["pre_canvas_out"])
+		with outputs["pre_canvas_out"]:
+			display(outputs["df_intro_out"])
+			display(outputs["tabs_out"])
+		display(outputs["canvas_out"])
+		display(outputs["post_canvas_out"])
+	display(outputs["main_out"])
 
 def load_local_vars():
     from IPython.core.getipython import get_ipython
     shell = get_ipython()
     #n = shell.set_next_input(contents, replace=False)
-    shell.run_cell("interactive_data_manipulation.local_vars = list(vars().items())")
+    shell.run_cell("interactive_data_manipulation.idm.local_vars = list(vars().items())")
 
 def df_dpd_change(change):
     if change['type'] == 'change' and change['name'] == 'value':
         _df = idm_dataframe(local_dfs[change['new']])
         _configs["df"] = _df
-        canvas_out.clear_output()
-        tabs_out.clear_output()
-        df_intro_out.clear_output()
+        outputs["canvas_out"].clear_output()
+        outputs["tabs_out"].clear_output()
+        outputs["df_intro_out"].clear_output()
 
-        with canvas_out:
+        with outputs["canvas_out"]:
         	display(widgets.Label(value="Data Preview:"))
         	display(_df.to_pd_df())
 
         if _configs["menu_unfolded"] is False:
-        	with menu_out:
+        	with outputs["menu_out"]:
         		render_menu()
         		_configs["menu_unfolded"] = True
 
+def clear_all_outputs():
+	for _out in outputs.values():
+		_out.clear_output()
+
 
 def load():
+	_configs["menu_unfolded"] = False
+	clear_all_outputs()
 	load_local_vars()
 	for item in [i for i in local_vars if not hasattr(i, '__call__')]:
 		name, value = item
